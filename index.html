@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<title>VOCAB</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:#f0f0f6;font-family:-apple-system,sans-serif;}
+#root{height:100%;}
+#loading{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;background:#f0f0f6;z-index:9999;transition:opacity .3s;}
+#loading.hide{opacity:0;pointer-events:none;}
+.ld-icon{font-size:48px;}
+.ld-title{font-size:20px;font-weight:700;color:#000;}
+.ld-sub{font-size:14px;color:rgba(0,0,0,.5);}
+.ld-bar{width:200px;height:4px;background:rgba(0,0,0,.1);border-radius:99px;overflow:hidden;}
+.ld-fill{height:100%;background:#007aff;border-radius:99px;animation:ldprog 2s ease forwards;}
+@keyframes ldprog{0%{width:0%}60%{width:70%}90%{width:90%}100%{width:100%}}
+</style>
+</head>
+<body>
+<!-- Loading screen -->
+<div id="loading">
+  <div class="ld-icon">📚</div>
+  <div class="ld-title">VOCAB</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+  <div class="ld-sub">로딩 중...</div>
+</div>
+<div id="root"></div>
+
+<!-- React 18 -->
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+<!-- Babel standalone for JSX -->
+
+<script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js" crossorigin></script>
+
+<script>
+// Hide loading when React renders
+window.__hideLoading = function() {
+  var el = document.getElementById('loading');
+  if(el){ el.classList.add('hide'); setTimeout(function(){ el.style.display='none'; }, 400); }
+};
+</script>
+
+<script type="text/babel" data-presets="react,env">
+const { useState, useRef, useEffect, useCallback } = React;
+
+const STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  :root{--sb:env(safe-area-inset-bottom,0px);--st:env(safe-area-inset-top,0px);--sl:env(safe-area-inset-left,0px);}
+  [data-t=dark]{
+    --bg:#000;--s1:#1c1c1e;--s2:#2c2c2e;--s3:#3a3a3c;
+    --t1:#fff;--t2:rgba(255,255,255,.6);--t3:rgba(255,255,255,.28);--t4:rgba(255,255,255,.1);
+    --ac:#0a84ff;--gn:#30d158;--rd:#ff453a;
+    --gf:rgba(28,28,32,.62);--gb:rgba(255,255,255,.13);--gs:rgba(255,255,255,.08);--nb:rgba(10,10,14,.88);
+  }
+  [data-t=light]{
+    --bg:#f0f0f6;--s1:#fff;--s2:#f2f2f7;--s3:#e5e5ea;
+    --t1:#000;--t2:rgba(0,0,0,.52);--t3:rgba(0,0,0,.28);--t4:rgba(0,0,0,.09);
+    --ac:#007aff;--gn:#34c759;--rd:#ff3b30;
+    --gf:rgba(255,255,255,.62);--gb:rgba(255,255,255,.88);--gs:rgba(255,255,255,.6);--nb:rgba(240,240,246,.9);
+  }
+  html,body,#root{height:100%;width:100%;overflow:hidden;background:var(--bg);color:var(--t1);
+    font-family:-apple-system,'Inter',sans-serif;-webkit-font-smoothing:antialiased;overscroll-behavior:none;}
+  .mesh{position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(ellipse 70% 50% at 15% 20%,rgba(100,60,255,.14) 0%,transparent 60%),
+      radial-gradient(ellipse 55% 40% at 85% 10%,rgba(0,140,255,.11) 0%,transparent 55%),
+      radial-gradient(ellipse 60% 55% at 55% 92%,rgba(255,40,160,.08) 0%,transparent 55%);}
+  .gl{background:var(--gf);backdrop-filter:blur(44px) saturate(180%);-webkit-backdrop-filter:blur(44px) saturate(180%);
+    border:1px solid var(--gb);box-shadow:inset 0 1px 0 var(--gs),0 6px 24px rgba(0,0,0,.14);}
+  .glc{background:rgba(255,255,255,.07);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,255,255,.1);}
+  [data-t=light] .glc{background:rgba(255,255,255,.82);border-color:rgba(255,255,255,.95);}
+  .sc{overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .sc::-webkit-scrollbar{display:none;}
+  .btn{font-family:inherit;font-weight:600;font-size:16px;border:none;border-radius:14px;
+    padding:13px 18px;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;
+    transition:transform .1s,opacity .1s;width:100%;}
+  .btn:active{transform:scale(.96);opacity:.8;}
+  .ba{background:var(--ac);color:#fff;}
+  .bgn{background:rgba(48,209,88,.18);color:var(--gn);}
+  .brd{background:rgba(255,69,58,.18);color:var(--rd);}
+  .bgh{background:rgba(255,255,255,.1);color:var(--t1);}
+  [data-t=light] .bgh{background:rgba(0,0,0,.08);}
+  [data-t=light] .bgn{background:rgba(52,199,89,.14);color:#1a7f3c;}
+  [data-t=light] .brd{background:rgba(255,59,48,.1);color:#c0392b;}
+  .inp{width:100%;font-family:inherit;font-size:16px;background:rgba(255,255,255,.09);color:var(--t1);
+    border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:11px 14px;outline:none;-webkit-appearance:none;}
+  .inp::placeholder{color:var(--t3);}
+  .inp:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(10,132,255,.15);}
+  [data-t=light] .inp{background:rgba(0,0,0,.05);border-color:rgba(0,0,0,.1);}
+  .pt{height:3px;background:var(--t4);border-radius:99px;overflow:hidden;}
+  .pf{height:100%;background:var(--ac);border-radius:99px;transition:width .4s ease;}
+  .tbw{position:fixed;z-index:100;pointer-events:none;}
+  .tbw.por{bottom:0;left:0;right:0;padding:0 16px calc(10px + var(--sb)) 16px;}
+  .tbw.lan{top:0;bottom:0;left:0;padding:calc(var(--st)+10px) 8px calc(var(--sb)+10px) calc(var(--sl)+8px);
+    width:auto;display:flex;flex-direction:column;justify-content:center;}
+  .tb{display:flex;background:var(--nb);backdrop-filter:blur(50px) saturate(200%);
+    -webkit-backdrop-filter:blur(50px) saturate(200%);border:1px solid var(--gb);
+    box-shadow:inset 0 1px 0 var(--gs),0 8px 32px rgba(0,0,0,.2);pointer-events:all;}
+  .tb.por{border-radius:26px;padding:5px;gap:3px;}
+  .tb.lan{border-radius:22px;padding:5px;gap:3px;flex-direction:column;}
+  .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    background:none;border:none;cursor:pointer;touch-action:manipulation;
+    color:var(--t3);font-family:inherit;font-size:10px;font-weight:500;
+    transition:color .2s,background .2s;border-radius:20px;}
+  .tb.por .tab{flex:1;padding:8px 4px 7px;}
+  .tb.lan .tab{padding:10px 12px;}
+  .tab.on{color:var(--ac);background:rgba(10,132,255,.12);}
+  [data-t=light] .tab.on{background:rgba(0,122,255,.1);}
+  .tab svg{width:22px;height:22px;}
+  .wrow{display:flex;align-items:center;padding:11px 14px;gap:10px;min-height:48px;}
+  .wrow+.wrow{border-top:1px solid rgba(255,255,255,.04);}
+  [data-t=light] .wrow+.wrow{border-top-color:rgba(0,0,0,.05);}
+  .finput{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:1px;z-index:5;}
+  .sw-wrap{position:relative;width:51px;height:31px;flex-shrink:0;}
+  .sw-wrap input{position:absolute;opacity:0;width:0;height:0;}
+  .sw-track{position:absolute;inset:0;border-radius:99px;background:var(--s3);transition:background .25s;cursor:pointer;}
+  .sw-wrap input:checked+.sw-track{background:var(--gn);}
+  .sw-thumb{position:absolute;top:2px;left:2px;width:27px;height:27px;background:#fff;
+    border-radius:50%;box-shadow:0 2px 5px rgba(0,0,0,.28);transition:transform .25s cubic-bezier(.23,1,.32,1);}
+  .sw-wrap input:checked~.sw-thumb{transform:translateX(20px);}
+  .spin{width:28px;height:28px;border:2.5px solid var(--t4);border-top-color:var(--ac);
+    border-radius:50%;animation:spinning .8s linear infinite;}
+  .pills{display:flex;gap:6px;margin-bottom:14px;}
+  .pill{flex:1;height:3px;border-radius:99px;background:var(--t4);transition:background .3s;}
+  .pill.on{background:var(--ac);}
+  .phg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .phc{aspect-ratio:1;border-radius:12px;overflow:hidden;position:relative;background:var(--s2);}
+  .phc img{width:100%;height:100%;object-fit:cover;}
+  .phd{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.65);border:none;
+    border-radius:50%;width:22px;height:22px;color:#fff;font-size:12px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;}
+  .cw{border-radius:14px;overflow:hidden;touch-action:none;background:rgba(255,255,255,.07);}
+  .cw canvas{display:block;touch-action:none;width:100%;height:100%;}
+  .toast-el{position:fixed;left:50%;transform:translateX(-50%);
+    background:rgba(30,30,36,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;font-weight:500;
+    z-index:9999;white-space:nowrap;border:1px solid rgba(255,255,255,.1);
+    box-shadow:0 4px 20px rgba(0,0,0,.28);animation:fadeUp .25s ease;pointer-events:none;}
+  @keyframes fadeUp{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes pop{0%{transform:scale(.93)}55%{transform:scale(1.03)}100%{transform:scale(1)}}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  @keyframes spinning{to{transform:rotate(360deg)}}
+  @keyframes sli{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .apop{animation:pop .3s ease;}
+  .ashk{animation:shake .3s ease;}
+  .asli{animation:sli .25s ease forwards;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+`;
+
+// ── Storage ───────────────────────────────────────────────────────────────────
+const S = {
+  get: (k, fb) => { try { const v = localStorage.getItem(k); return v != null ? JSON.parse(v) : fb; } catch { return fb; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+let _id = Date.now();
+const uid = () => String(++_id);
+const shuf = a => { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; };
+
+// ── URL Share ─────────────────────────────────────────────────────────────────
+const encW = ws => btoa(encodeURIComponent(JSON.stringify(ws.map(w => ({ e: w.en, k: w.ko })))));
+const decW = s => { try { return JSON.parse(decodeURIComponent(atob(s))).map(d => ({ id: uid(), en: d.e, ko: d.k })); } catch { return null; } };
+const getShared = () => { const r = new URLSearchParams(location.search).get("w"); return r ? decW(r) : null; };
+const mkUrl = ws => location.origin + location.pathname + "?w=" + encW(ws);
+
+// ── TTS ───────────────────────────────────────────────────────────────────────
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-US"; u.rate = 0.85;
+  const vs = window.speechSynthesis.getVoices();
+  const v = vs.find(v => v.lang.startsWith("en") && v.localService) || vs.find(v => v.lang.startsWith("en"));
+  if (v) u.voice = v;
+  window.speechSynthesis.speak(u);
+}
+
+// ── Built-in Word DB ──────────────────────────────────────────────────────────
+function getTodayKey() {
+  const d = new Date();
+  return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+}
+
+const WORD_DB = {
+  "하": [
+    {en:"apple",ko:"사과",ex:"I eat an apple every day."},
+    {en:"book",ko:"책",ex:"This book is very interesting."},
+    {en:"water",ko:"물",ex:"Please drink more water."},
+    {en:"happy",ko:"행복한",ex:"She looks very happy today."},
+    {en:"school",ko:"학교",ex:"I go to school by bus."},
+    {en:"friend",ko:"친구",ex:"He is my best friend."},
+    {en:"family",ko:"가족",ex:"My family is very important to me."},
+    {en:"house",ko:"집",ex:"We live in a big house."},
+    {en:"food",ko:"음식",ex:"Korean food is delicious."},
+    {en:"time",ko:"시간",ex:"Time flies so fast."},
+    {en:"work",ko:"일하다",ex:"I work hard every day."},
+    {en:"love",ko:"사랑",ex:"Love is the most important thing."},
+    {en:"music",ko:"음악",ex:"I love listening to music."},
+    {en:"sleep",ko:"잠자다",ex:"I need eight hours of sleep."},
+    {en:"study",ko:"공부하다",ex:"You should study every day."},
+    {en:"run",ko:"달리다",ex:"She runs every morning."},
+    {en:"walk",ko:"걷다",ex:"I walk to work every morning."},
+    {en:"eat",ko:"먹다",ex:"What do you want to eat?"},
+    {en:"drink",ko:"마시다",ex:"Would you like to drink coffee?"},
+    {en:"help",ko:"돕다",ex:"Can you help me please?"},
+    {en:"think",ko:"생각하다",ex:"Think before you speak."},
+    {en:"know",ko:"알다",ex:"I know the answer."},
+    {en:"feel",ko:"느끼다",ex:"How do you feel today?"},
+    {en:"want",ko:"원하다",ex:"What do you want?"},
+    {en:"need",ko:"필요하다",ex:"I need your help."},
+    {en:"nice",ko:"좋은",ex:"What a nice day!"},
+    {en:"big",ko:"큰",ex:"This is a big city."},
+    {en:"small",ko:"작은",ex:"She has a small dog."},
+    {en:"new",ko:"새로운",ex:"I bought a new phone."},
+    {en:"good",ko:"좋은",ex:"You did a good job."},
+    {en:"fast",ko:"빠른",ex:"He is a fast runner."},
+    {en:"easy",ko:"쉬운",ex:"This test is easy."},
+    {en:"hard",ko:"어려운",ex:"Math is hard for me."},
+    {en:"open",ko:"열다",ex:"Open the window please."},
+    {en:"start",ko:"시작하다",ex:"Let us start the meeting."},
+    {en:"stop",ko:"멈추다",ex:"Stop right there."},
+    {en:"read",ko:"읽다",ex:"I read books every night."},
+    {en:"write",ko:"쓰다",ex:"Write your name here."},
+    {en:"call",ko:"전화하다",ex:"Call me when you arrive."},
+    {en:"wait",ko:"기다리다",ex:"Please wait a moment."},
+    {en:"meet",ko:"만나다",ex:"Nice to meet you."},
+    {en:"find",ko:"찾다",ex:"I cannot find my keys."},
+    {en:"bring",ko:"가져오다",ex:"Bring your notebook."},
+    {en:"keep",ko:"유지하다",ex:"Keep going you can do it."},
+    {en:"buy",ko:"사다",ex:"I want to buy this shirt."},
+    {en:"send",ko:"보내다",ex:"I will send you an email."},
+    {en:"play",ko:"놀다",ex:"Children love to play outside."},
+    {en:"talk",ko:"말하다",ex:"We need to talk."},
+    {en:"give",ko:"주다",ex:"Give me a chance."},
+    {en:"take",ko:"가져가다",ex:"Take this umbrella."},
+    {en:"leave",ko:"떠나다",ex:"I will leave at 9 am."},
+  ],
+  "중": [
+    {en:"achieve",ko:"달성하다",ex:"She achieved her dream."},
+    {en:"balance",ko:"균형",ex:"Find a balance between work and life."},
+    {en:"capable",ko:"유능한",ex:"He is a capable engineer."},
+    {en:"challenge",ko:"도전",ex:"Life is full of challenges."},
+    {en:"confident",ko:"자신감 있는",ex:"Be confident in yourself."},
+    {en:"courage",ko:"용기",ex:"It takes courage to change."},
+    {en:"creative",ko:"창의적인",ex:"She is very creative."},
+    {en:"curious",ko:"호기심 많은",ex:"Children are naturally curious."},
+    {en:"decision",ko:"결정",ex:"It was a difficult decision."},
+    {en:"develop",ko:"발전하다",ex:"We need to develop new skills."},
+    {en:"effort",ko:"노력",ex:"Success requires a lot of effort."},
+    {en:"encourage",ko:"격려하다",ex:"Always encourage your friends."},
+    {en:"experience",ko:"경험",ex:"Experience is the best teacher."},
+    {en:"explore",ko:"탐험하다",ex:"Let us explore new ideas."},
+    {en:"flexible",ko:"유연한",ex:"Be flexible in your thinking."},
+    {en:"focus",ko:"집중하다",ex:"Focus on what matters most."},
+    {en:"grateful",ko:"감사하는",ex:"Be grateful for small things."},
+    {en:"honest",ko:"정직한",ex:"Always be honest with others."},
+    {en:"improve",ko:"향상시키다",ex:"Practice every day to improve."},
+    {en:"inspire",ko:"영감을 주다",ex:"Great teachers inspire students."},
+    {en:"patient",ko:"인내심 있는",ex:"Be patient with yourself."},
+    {en:"prepare",ko:"준비하다",ex:"Prepare well for the exam."},
+    {en:"progress",ko:"진전",ex:"I can see your progress."},
+    {en:"realize",ko:"깨닫다",ex:"I realized my mistake."},
+    {en:"respect",ko:"존중하다",ex:"Respect everyone around you."},
+    {en:"responsible",ko:"책임감 있는",ex:"Be responsible for your actions."},
+    {en:"strategy",ko:"전략",ex:"We need a better strategy."},
+    {en:"succeed",ko:"성공하다",ex:"Work hard and you will succeed."},
+    {en:"support",ko:"지지하다",ex:"Support your team members."},
+    {en:"talented",ko:"재능 있는",ex:"She is a talented musician."},
+    {en:"teamwork",ko:"팀워크",ex:"Good teamwork leads to success."},
+    {en:"tradition",ko:"전통",ex:"This is an important tradition."},
+    {en:"unique",ko:"독특한",ex:"Everyone is unique in their own way."},
+    {en:"valuable",ko:"가치 있는",ex:"Time is the most valuable thing."},
+    {en:"vision",ko:"비전",ex:"A leader needs a clear vision."},
+    {en:"wisdom",ko:"지혜",ex:"With age comes wisdom."},
+    {en:"maintain",ko:"유지하다",ex:"Maintain a healthy lifestyle."},
+    {en:"manage",ko:"관리하다",ex:"Learn to manage your time."},
+    {en:"overcome",ko:"극복하다",ex:"You can overcome any obstacle."},
+    {en:"practical",ko:"실용적인",ex:"Choose a practical solution."},
+    {en:"precise",ko:"정확한",ex:"Be precise in your work."},
+    {en:"productive",ko:"생산적인",ex:"Have a productive day."},
+    {en:"reliable",ko:"믿을 수 있는",ex:"Be a reliable person."},
+    {en:"significant",ko:"중요한",ex:"This is a significant change."},
+    {en:"solution",ko:"해결책",ex:"Every problem has a solution."},
+    {en:"sufficient",ko:"충분한",ex:"Is this sufficient for you?"},
+    {en:"suitable",ko:"적합한",ex:"Find a suitable job for you."},
+    {en:"transfer",ko:"이전하다",ex:"Transfer the files to my computer."},
+    {en:"transform",ko:"변환하다",ex:"Exercise can transform your body."},
+    {en:"transparent",ko:"투명한",ex:"Be transparent with your team."},
+    {en:"utilize",ko:"활용하다",ex:"Utilize your time wisely."},
+    {en:"various",ko:"다양한",ex:"There are various ways to solve this."},
+  ],
+  "상": [
+    {en:"aberrant",ko:"비정상적인",ex:"His aberrant behavior worried everyone."},
+    {en:"alacrity",ko:"민첩함",ex:"She accepted the offer with alacrity."},
+    {en:"ambiguous",ko:"모호한",ex:"The instructions were ambiguous."},
+    {en:"ameliorate",ko:"개선하다",ex:"We must ameliorate the situation."},
+    {en:"arduous",ko:"힘든",ex:"It was an arduous journey."},
+    {en:"articulate",ko:"명확히 표현하다",ex:"She articulated her ideas clearly."},
+    {en:"astute",ko:"영리한",ex:"He is an astute businessman."},
+    {en:"audacious",ko:"대담한",ex:"It was an audacious plan."},
+    {en:"benevolent",ko:"자비로운",ex:"She is a benevolent leader."},
+    {en:"candid",ko:"솔직한",ex:"Please be candid with me."},
+    {en:"circumspect",ko:"신중한",ex:"Be circumspect in your decisions."},
+    {en:"clandestine",ko:"비밀스러운",ex:"They held a clandestine meeting."},
+    {en:"cogent",ko:"설득력 있는",ex:"She made a cogent argument."},
+    {en:"complacent",ko:"자기만족적인",ex:"Do not become complacent with success."},
+    {en:"convoluted",ko:"복잡한",ex:"The plot was too convoluted."},
+    {en:"debilitate",ko:"약화시키다",ex:"The illness debilitated him greatly."},
+    {en:"diligent",ko:"근면한",ex:"A diligent student always succeeds."},
+    {en:"disparate",ko:"이질적인",ex:"They come from disparate backgrounds."},
+    {en:"eloquent",ko:"유창한",ex:"She gave an eloquent speech."},
+    {en:"emulate",ko:"모방하다",ex:"Try to emulate the best."},
+    {en:"enigmatic",ko:"수수께끼 같은",ex:"He had an enigmatic smile."},
+    {en:"ephemeral",ko:"순간적인",ex:"Fame is often ephemeral."},
+    {en:"equivocal",ko:"불분명한",ex:"His answer was equivocal."},
+    {en:"exacerbate",ko:"악화시키다",ex:"Stress can exacerbate illness."},
+    {en:"exemplary",ko:"모범적인",ex:"She showed exemplary behavior."},
+    {en:"fastidious",ko:"까다로운",ex:"He is fastidious about details."},
+    {en:"fortuitous",ko:"우연한",ex:"It was a fortuitous encounter."},
+    {en:"garrulous",ko:"수다스러운",ex:"The garrulous host talked all night."},
+    {en:"gregarious",ko:"사교적인",ex:"She is naturally gregarious."},
+    {en:"impeccable",ko:"흠잡을 데 없는",ex:"His manners were impeccable."},
+    {en:"incisive",ko:"날카로운",ex:"She made an incisive remark."},
+    {en:"inevitable",ko:"불가피한",ex:"Change is inevitable."},
+    {en:"insightful",ko:"통찰력 있는",ex:"That was an insightful observation."},
+    {en:"intrepid",ko:"용감한",ex:"The intrepid explorer ventured on."},
+    {en:"judicious",ko:"현명한",ex:"Make a judicious decision."},
+    {en:"loquacious",ko:"말이 많은",ex:"He is known for being loquacious."},
+    {en:"magnanimous",ko:"관대한",ex:"It was magnanimous of him to forgive."},
+    {en:"meticulous",ko:"꼼꼼한",ex:"She is meticulous in her work."},
+    {en:"nonchalant",ko:"태연한",ex:"He was nonchalant about the risk."},
+    {en:"obstinate",ko:"완고한",ex:"He was too obstinate to change."},
+    {en:"ostentatious",ko:"과시하는",ex:"She wore an ostentatious dress."},
+    {en:"paramount",ko:"최고로 중요한",ex:"Safety is of paramount importance."},
+    {en:"pedantic",ko:"학자연하는",ex:"Do not be too pedantic."},
+    {en:"pragmatic",ko:"실용적인",ex:"Take a pragmatic approach."},
+    {en:"precocious",ko:"조숙한",ex:"She was a precocious child."},
+    {en:"resilience",ko:"회복력",ex:"Resilience is key to overcoming failure."},
+    {en:"serendipity",ko:"뜻밖의 행운",ex:"Finding that job was pure serendipity."},
+    {en:"tenacious",ko:"끈질긴",ex:"Be tenacious in pursuing your goals."},
+    {en:"ubiquitous",ko:"어디에나 있는",ex:"Smartphones are now ubiquitous."},
+    {en:"venerable",ko:"존경받는",ex:"He is a venerable scholar."},
+    {en:"voracious",ko:"탐욕스러운",ex:"He is a voracious reader."},
+    {en:"zealous",ko:"열정적인",ex:"He is a zealous advocate for change."},
+  ]
+};
+
+function getDailyWords(level, count) {
+  const pool = [...(WORD_DB[level] || WORD_DB["중"])];
+  // 날짜 기반 시드 셔플 → 매일 다른 단어
+  const seed = getTodayKey().split("-").reduce((a, b) => a + parseInt(b), 0);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = (Math.abs(Math.sin(seed * (i + 1)) * 10000) | 0) % (i + 1);
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, Math.min(count, pool.length));
+}
+
+// ── Tesseract OCR ─────────────────────────────────────────────────────────────
+let _worker = null;
+async function loadTS() {
+  if (window.Tesseract) return window.Tesseract;
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js";
+    s.onload = () => res(window.Tesseract); s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+async function getWorker(onProg) {
+  if (_worker) return _worker;
+  const T = await loadTS();
+  _worker = await T.createWorker(["eng", "kor"], 1, {
+    logger: m => {
+      if (!onProg) return;
+      if (m.status === "loading language traineddata") onProg(10, "언어 데이터 로딩 중...");
+      if (m.status === "initializing api") onProg(30, "초기화 중...");
+      if (m.status === "recognizing text") onProg(40 + Math.round(m.progress * 55), "텍스트 인식 중...");
+    }
+  });
+  return _worker;
+}
+function parsePairs(text) {
+  const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
+  const pairs = [];
+  const KOR = /[\uac00-\ud7a3]/;
+  const PATS = [
+    /^([a-zA-Z][a-zA-Z\s'-]{1,28}?)\s*[-:·\/]\s*([\uac00-\ud7a3][\uac00-\ud7a3\s,()]{0,20})$/,
+    /^([a-zA-Z][a-zA-Z\s'-]{1,28}?)\s{2,}([\uac00-\ud7a3][\uac00-\ud7a3\s,()]{0,20})$/,
+    /^([a-zA-Z][a-zA-Z\s'-]{1,28}?)\s+([\uac00-\ud7a3][\uac00-\ud7a3\s,()]{0,20})$/,
+    /^\d+[.)]\s*([a-zA-Z][a-zA-Z\s'-]{1,28}?)\s*[-:\s]+([\uac00-\ud7a3][\uac00-\ud7a3\s,()]{0,20})$/,
+  ];
+  for (const line of lines) {
+    if (!KOR.test(line) || !/[a-zA-Z]/.test(line)) continue;
+    for (const pat of PATS) {
+      const m = line.match(pat);
+      if (m) { const en = m[1].trim(), ko = m[2].trim(); if (en.length >= 2 && ko.length >= 1) { pairs.push({ en, ko }); break; } }
+    }
+  }
+  const seen = new Set();
+  return pairs.filter(p => { const k = p.en.toLowerCase(); return seen.has(k) ? false : seen.add(k); });
+}
+async function doOCR(file, onProg) {
+  const w = await getWorker(onProg);
+  const url = URL.createObjectURL(file);
+  try { const { data: { text } } = await w.recognize(url); return parsePairs(text); }
+  finally { URL.revokeObjectURL(url); }
+}
+
+// ── Pen colors ────────────────────────────────────────────────────────────────
+const PENS = [
+  { id: "red", label: "빨간 펜",   hex: "#FF2020", emoji: "🔴" },
+  { id: "blu", label: "파란 펜",   hex: "#1E6AFF", emoji: "🔵" },
+  { id: "yel", label: "형광 노랑", hex: "#FFE500", emoji: "🟡" },
+];
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const IcoList  = c => <svg viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r=".8" fill={c} stroke="none"/><circle cx="3" cy="12" r=".8" fill={c} stroke="none"/><circle cx="3" cy="18" r=".8" fill={c} stroke="none"/></svg>;
+const IcoFlash = c => <svg viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+const IcoSpell = c => <svg viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4z"/></svg>;
+const IcoGear  = c => <svg viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>;
+const IcoDaily = c => <svg viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="8" cy="14" r=".8" fill={c} stroke="none"/><circle cx="12" cy="14" r=".8" fill={c} stroke="none"/><circle cx="16" cy="14" r=".8" fill={c} stroke="none"/></svg>;
+const IcoSpk   = c => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.2" strokeLinecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 010 7.07"/><path d="M19.07 4.93a10 10 0 010 14.14"/></svg>;
+
+// ── Switch ────────────────────────────────────────────────────────────────────
+function Sw({ on, onChange }) {
+  return (
+    <label className="sw-wrap">
+      <input type="checkbox" checked={on} onChange={e => onChange(e.target.checked)} />
+      <div className="sw-track" />
+      <div className="sw-thumb" />
+    </label>
+  );
+}
+
+// ── ProgBar ───────────────────────────────────────────────────────────────────
+function ProgBar({ val, max, ok, bad }) {
+  const pct = max ? Math.round(val / max * 100) : 0;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
+        <span style={{ fontSize: 13, color: "var(--t2)" }}>{val + " / " + max}</span>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>
+          <span style={{ color: "var(--gn)" }}>{"✓ " + ok}</span>
+          <span style={{ color: "var(--t3)", margin: "0 5px" }}>·</span>
+          <span style={{ color: "var(--rd)" }}>{"✗ " + bad}</span>
+        </span>
+      </div>
+      <div className="pt"><div className="pf" style={{ width: pct + "%" }} /></div>
+    </div>
+  );
+}
+
+function Empty({ icon, title, sub }) {
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 32, opacity: .5 }}>
+      <div style={{ fontSize: 46 }}>{icon}</div>
+      <p style={{ fontSize: 17, fontWeight: 600, textAlign: "center" }}>{title}</p>
+      {sub && <p style={{ fontSize: 14, color: "var(--t2)", textAlign: "center", lineHeight: 1.6 }}>{sub}</p>}
+    </div>
+  );
+}
+
+function Done({ icon, title, ok, bad, onRetry }) {
+  return (
+    <div className="asli" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 18, padding: 32 }}>
+      <div style={{ fontSize: 56 }}>{icon}</div>
+      <div style={{ textAlign: "center" }}>
+        <p style={{ fontSize: 26, fontWeight: 700, marginBottom: 4 }}>{title}</p>
+        <p style={{ fontSize: 15, color: "var(--t2)" }}>오늘도 수고했어요!</p>
+      </div>
+      <div style={{ display: "flex", gap: 36 }}>
+        <div style={{ textAlign: "center" }}><div style={{ fontSize: 30, fontWeight: 700, color: "var(--gn)" }}>{ok}</div><div style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>알았어요</div></div>
+        <div style={{ width: 1, background: "var(--t4)" }} />
+        <div style={{ textAlign: "center" }}><div style={{ fontSize: 30, fontWeight: 700, color: "var(--rd)" }}>{bad}</div><div style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>몰랐어요</div></div>
+      </div>
+      <button className="btn ba" onClick={onRetry} style={{ marginTop: 4 }}>다시 시작</button>
+    </div>
+  );
+}
+
+// ── DAILY WORDS ───────────────────────────────────────────────────────────────
+function DailyScreen({ cfg, onAddWords }) {
+  const today = getTodayKey();
+  const words = getDailyWords(cfg.dailyLevel, cfg.dailyCount);
+  const [added, setAdded] = useState(false);
+  const [prevDate, setPrevDate] = useState(today);
+
+  // 날짜 바뀌면 added 리셋
+  useEffect(() => {
+    if (prevDate !== today) { setAdded(false); setPrevDate(today); }
+  }, [today, prevDate]);
+
+  const lvColor = { "하": "#30d158", "중": "#0a84ff", "상": "#ff453a" };
+  const lc = lvColor[cfg.dailyLevel] || "var(--ac)";
+  const lvLabel = { "하": "초급", "중": "중급", "상": "고급" };
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      {/* Header */}
+      <div style={{ padding: "14px 16px 8px", flexShrink: 0 }}>
+        <p style={{ fontSize: 22, fontWeight: 700, marginBottom: 2 }}>오늘의 단어</p>
+        <p style={{ fontSize: 13, color: "var(--t2)" }}>
+          {today} · <span style={{ color: lc, fontWeight: 600 }}>{lvLabel[cfg.dailyLevel]}</span> · {words.length}개
+        </p>
+      </div>
+      {/* Word list */}
+      <div className="sc" style={{ flex: 1, padding: "4px 16px 8px" }}>
+        <div className="glc" style={{ borderRadius: 16, overflow: "hidden" }}>
+          {words.map((w, i) => (
+            <div key={i} style={{ padding: "12px 14px", borderBottom: i < words.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: w.ex ? 4 : 0 }}>
+                <span style={{ fontWeight: 700, fontSize: 16 }}>{w.en}</span>
+                <span style={{ fontSize: 14, color: "var(--t2)" }}>{w.ko}</span>
+                <button onClick={() => speak(w.en)} style={{ background: "none", border: "none", color: "var(--ac)", padding: "2px 4px", cursor: "pointer", touchAction: "manipulation", display: "flex", alignItems: "center", marginLeft: "auto", flexShrink: 0 }}>
+                  {IcoSpk("var(--ac)")}
+                </button>
+              </div>
+              {w.ex && <p style={{ fontSize: 12, color: "var(--t3)", lineHeight: 1.5, fontStyle: "italic" }}>{w.ex}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Add button */}
+      <div style={{ padding: "8px 16px 12px", flexShrink: 0 }}>
+        {!added
+          ? <button className="btn ba" onClick={() => { onAddWords(words); setAdded(true); }}>
+              단어장에 모두 추가하기 +
+            </button>
+          : <div style={{ padding: "13px", borderRadius: 14, textAlign: "center", background: "rgba(48,209,88,.15)", border: "1px solid rgba(48,209,88,.25)", color: "var(--gn)", fontWeight: 600 }}>
+              ✓ 단어장에 추가됐어요!
+            </div>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── FLASH ─────────────────────────────────────────────────────────────────────
+// ── FLASH LAUNCHER (시작 전 설정 선택) ───────────────────────────────────────
+function FlashLauncher({ words, cfg, onCfg }) {
+  const [started, setStarted] = useState(false);
+  const [localShuffle,  setLS] = useState(cfg.shuffle);
+  const [localRetry,    setLR] = useState(cfg.flashRetry);
+
+
+  if (started) {
+    const deck = localShuffle ? shuf(words) : [...words];
+    return <Flash words={deck} flashRetry={localRetry} onBack={() => setStarted(false)} />;
+  }
+
+  const Row = ({ icon, bg, label, sub, on, onChange }) => (
+    <div style={{ display:"flex", alignItems:"center", padding:"13px 16px", gap:12, borderTop:"1px solid rgba(255,255,255,.04)" }}>
+      <div style={{ width:34, height:34, borderRadius:9, background:bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, flexShrink:0 }}>{icon}</div>
+      <div style={{ flex:1 }}>
+        <p style={{ fontSize:15, fontWeight:500 }}>{label}</p>
+        {sub && <p style={{ fontSize:12, color:"var(--t3)", marginTop:1 }}>{sub}</p>}
+      </div>
+      <Sw on={on} onChange={onChange} />
+    </div>
+  );
+
+  return (
+    <div style={{ flex:1, display:"flex", flexDirection:"column", padding:"20px 16px 0" }}>
+      <p style={{ fontSize:24, fontWeight:700, marginBottom:4 }}>플래시카드</p>
+      <p style={{ fontSize:14, color:"var(--t2)", marginBottom:20 }}>
+        {words.length + "개의 단어 · 시작 전 옵션을 선택하세요"}
+      </p>
+
+      <div className="glc" style={{ borderRadius:18, overflow:"hidden", marginBottom:16 }}>
+        {/* 첫 행은 border 없이 */}
+        <div style={{ display:"flex", alignItems:"center", padding:"13px 16px", gap:12 }}>
+          <div style={{ width:34, height:34, borderRadius:9, background:"#1a3a6e", display:"flex", alignItems:"center", justifyContent:"center", fontSize:17, flexShrink:0 }}>🔀</div>
+          <div style={{ flex:1 }}>
+            <p style={{ fontSize:15, fontWeight:500 }}>셔플</p>
+            <p style={{ fontSize:12, color:"var(--t3)", marginTop:1 }}>단어 순서를 무작위로</p>
+          </div>
+          <Sw on={localShuffle} onChange={v => { setLS(v); onCfg("shuffle", v); }} />
+        </div>
+        <Row icon="🔁" bg="#3a1a6e" label="틀린 단어 복습"    sub="1바퀴 후 틀린 것만 다시"    on={localRetry}  onChange={v => { setLR(v); onCfg("flashRetry", v); }} />
+        {/* 🎤 발음 모드: HTTPS 환경에서만 작동 (배포 후 활성화) */}
+      </div>
+
+      {words.length === 0
+        ? <Empty icon="📚" title="단어가 없어요" sub="단어장 탭에서 먼저 추가해주세요" />
+        : <button className="btn ba" style={{ fontSize:17, padding:"15px" }} onClick={() => setStarted(true)}>
+            시작하기 →
+          </button>
+      }
+    </div>
+  );
+}
+
+function Flash({ words, flashRetry, onBack }) {
+  // ── 라운드 관리 ──
+  // round=1: 전체, round=2: 틀린것만
+  const [round, setRound] = useState(1);
+  const [deck, setDeck] = useState(() => shuf(words));
+  const [idx, setIdx] = useState(0);
+  const [phase, setPhase] = useState("q"); // "q" | "j"
+  const [judgeOk, setJOk] = useState(null);
+  const [ok, setOk] = useState(0);
+  const [bad, setBad] = useState(0);
+  const [wrongWords, setWrongWords] = useState([]); // 1라운드에서 틀린 단어
+  const [done, setDone] = useState(false); // 완전히 끝
+  const [ck, setCk] = useState(0);
+
+
+
+  const card = deck[idx];
+
+
+
+  if (!deck.length && !done) return <Empty icon="📚" title="단어가 없어요" sub="단어장 탭에서 추가해주세요" />;
+
+  // ── 전체 완료 ──
+  if (done) return (
+    <Done icon="🎉" title="완료!" ok={ok} bad={bad} onRetry={() => {
+      setRound(1); setDeck(shuf(words)); setIdx(0); setPhase("q");
+      setJOk(null); setOk(0); setBad(0); setWrongWords([]); setDone(false); setCk(k=>k+1);
+    }} />
+  );
+
+  // ── 1라운드 끝 → 2라운드 (틀린것만) ──
+  if (idx >= deck.length && flashRetry && wrongWords.length > 0 && round === 1) {
+    return (
+      <div className="asli" style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:18, padding:32 }}>
+        <div style={{ fontSize: 52 }}>🔄</div>
+        <div style={{ textAlign: "center" }}>
+          <p style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>1라운드 완료!</p>
+          <p style={{ fontSize: 15, color: "var(--t2)", lineHeight: 1.6 }}>
+            {"틀린 단어 "}<span style={{ color: "var(--rd)", fontWeight: 700 }}>{wrongWords.length + "개"}</span>{"를 다시 볼게요."}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 28 }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--gn)" }}>{ok}</div>
+            <div style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>알았어요</div>
+          </div>
+          <div style={{ width: 1, background: "var(--t4)" }} />
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "var(--rd)" }}>{wrongWords.length}</div>
+            <div style={{ fontSize: 12, color: "var(--t2)", marginTop: 2 }}>다시 볼게요</div>
+          </div>
+        </div>
+        <button className="btn ba" onClick={() => {
+          setRound(2); setDeck(shuf(wrongWords)); setIdx(0);
+          setPhase("q"); setJOk(null); setWrongWords([]); setCk(k=>k+1);
+        }}>틀린 단어 복습하기 →</button>
+        <button className="btn bgh" style={{ marginTop: -8 }} onClick={() => setDone(true)}>그냥 끝내기</button>
+      </div>
+    );
+  }
+
+  // ── judge ──
+  const judge = isOk => {
+    if (isOk) setOk(oc => oc + 1);
+    else {
+      setBad(bc => bc + 1);
+      if (round === 1) setWrongWords(w => [...w, { ...card, _retries: undefined }]);
+    }
+    setJOk(isOk); setPhase("j");
+  };
+
+  const next = () => {
+    setCk(k => k + 1); setPhase("q"); setJOk(null);
+    if (idx + 1 >= deck.length) {
+      if (!flashRetry || wrongWords.length === 0 || round === 2) setDone(true);
+      else setIdx(idx + 1); // triggers round-end screen above
+    } else {
+      setIdx(i => i + 1);
+    }
+  };
+
+
+
+  const isJ = phase === "j";
+  const rc  = judgeOk ? "var(--gn)" : "var(--rd)";
+  const rbg = judgeOk ? "rgba(48,209,88,.13)" : "rgba(255,69,58,.13)";
+  const rbr = judgeOk ? "rgba(48,209,88,.25)" : "rgba(255,69,58,.25)";
+
+  return (
+    <div style={{ flex:1, display:"flex", flexDirection:"column", padding:"14px 16px 0" }}>
+      <ProgBar val={idx} max={deck.length} ok={ok} bad={bad} />
+      <div style={{ display:"flex", justifyContent:"center", alignItems:"center", gap:8, marginBottom:12 }}>
+        {onBack && <button onClick={onBack} style={{ background:"none", border:"none", color:"var(--ac)", fontSize:13, fontWeight:600, cursor:"pointer", touchAction:"manipulation", padding:"2px 0", marginRight:4 }}>← 뒤로</button>}
+        <p style={{ fontSize:13, color:"var(--t3)", fontWeight:500 }}>{(idx+1) + " / " + deck.length}</p>
+        {round === 2 && <span style={{ fontSize:11, color:"var(--rd)", background:"rgba(255,69,58,.15)", borderRadius:99, padding:"2px 8px", fontWeight:600 }}>복습 라운드</span>}
+
+      </div>
+
+      <div key={ck} className="gl apop" style={{ borderRadius:22, padding:"24px 20px", marginBottom:16, flexShrink:0, minHeight:200, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:10, textAlign:"center", background:isJ?rbg:"var(--gf)", border:isJ?"1px solid "+rbr:"1px solid var(--gb)" }}>
+        {!isJ ? (
+  <>
+              <p style={{ fontSize:11, color:"var(--t3)", letterSpacing:".14em", fontWeight:600, textTransform:"uppercase" }}>한국어 뜻</p>
+              <p style={{ fontSize:38, fontWeight:700, lineHeight:1.2 }}>{card.ko}</p>
+              <p style={{ fontSize:13, color:"var(--t3)", marginTop:4 }}>영어 단어를 떠올려보세요</p>
+            </>
+        ) : (
+          <>
+            <p style={{ fontSize:13, fontWeight:700, color:rc }}>{judgeOk ? "✓ 정확해요!" : "✗ 틀렸어요"}</p>
+            <p style={{ fontSize:11, color:"var(--t3)", letterSpacing:".14em", fontWeight:600, textTransform:"uppercase", marginTop:4 }}>정답</p>
+            <p style={{ fontSize:40, fontWeight:700, color:rc, lineHeight:1.15 }}>{card.en}</p>
+            <p style={{ fontSize:16, color:"var(--t2)", marginTop:2 }}>{card.ko}</p>
+            <button onClick={() => speak(card.en)} style={{ marginTop:8, background:"rgba(10,132,255,.2)", border:"2px solid rgba(10,132,255,.35)", borderRadius:22, padding:"9px 20px", display:"flex", alignItems:"center", gap:7, cursor:"pointer", touchAction:"manipulation", color:"var(--ac)", fontSize:15, fontFamily:"inherit", fontWeight:700 }}>
+              {IcoSpk("var(--ac)")} 정답 발음 듣기
+            </button>
+          </>
+        )}
+      </div>
+
+
+
+      {!isJ ? (
+        <div style={{ display:"flex", gap:12 }}>
+          <button className="btn brd" style={{ flex:1 }} onClick={() => judge(false)}>✗ 몰랐어요</button>
+          <button className="btn bgn" style={{ flex:1 }} onClick={() => judge(true)}>✓ 알았어요</button>
+        </div>
+      ) : (
+        <button className="btn ba" onClick={next}>다음 단어 →</button>
+      )}
+    </div>
+  );
+}
+
+
+// ── DrawCanvas ────────────────────────────────────────────────────────────────
+function DrawCanvas({ onSubmit }) {
+  const ref = useRef(null);
+  const drawing = useRef(false);
+  const last = useRef(null);
+  const getXY = (e, c) => { const r = c.getBoundingClientRect(); const s = e.touches ? e.touches[0] : e; return { x: (s.clientX - r.left) * (c.width / r.width), y: (s.clientY - r.top) * (c.height / r.height) }; };
+  const start = e => { e.preventDefault(); drawing.current = true; last.current = getXY(e, ref.current); };
+  const move = e => { e.preventDefault(); if (!drawing.current) return; const c = ref.current; const ctx = c.getContext("2d"); const pos = getXY(e, c); ctx.strokeStyle = "var(--t1)"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(last.current.x, last.current.y); ctx.lineTo(pos.x, pos.y); ctx.stroke(); last.current = pos; };
+  const end = e => { e.preventDefault(); drawing.current = false; };
+  const clear = () => { const c = ref.current; c.getContext("2d").clearRect(0, 0, c.width, c.height); };
+  useEffect(() => { const c = ref.current; const resize = () => { c.width = c.offsetWidth; c.height = c.offsetHeight; }; resize(); const ro = new ResizeObserver(resize); ro.observe(c); return () => ro.disconnect(); }, []);
+  return (
+    <div>
+      <div className="cw" style={{ height: 130, marginBottom: 10 }}>
+        <canvas ref={ref} onMouseDown={start} onMouseMove={move} onMouseUp={end} onMouseLeave={end} onTouchStart={start} onTouchMove={move} onTouchEnd={end} />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="btn bgh" style={{ flex: 1, padding: "10px", fontSize: 14 }} onClick={clear}>지우기</button>
+        <button className="btn ba" style={{ flex: 2, padding: "10px" }} onClick={() => onSubmit(ref.current.toDataURL("image/png"))}>제출</button>
+      </div>
+    </div>
+  );
+}
+
+// ── SPELL ─────────────────────────────────────────────────────────────────────
+function Spell({ words, defMode }) {
+  const [deck] = useState(() => shuf(words));
+  const [idx, setIdx] = useState(0);
+  const [val, setVal] = useState("");
+  const [res, setRes] = useState(null);
+  const [ok, setOk] = useState(0);
+  const [bad, setBad] = useState(0);
+  const [sk, setSk] = useState(0);
+  const [mode, setMode] = useState(defMode || "type");
+  const [checking, setChecking] = useState(false);
+  const iref = useRef(null);
+  useEffect(() => { if (mode === "type" && !res) iref.current?.focus(); }, [idx, mode, res]);
+
+  if (!deck.length) return <Empty icon="✍️" title="단어가 없어요" sub="단어장 탭에서 추가해주세요" />;
+  if (idx >= deck.length) return <Done icon="✅" title="스펠링 완료!" ok={ok} bad={bad} onRetry={() => { setIdx(0); setVal(""); setRes(null); setOk(0); setBad(0); }} />;
+
+  const card = deck[idx];
+  const check = ans => { const isOk = ans.trim().toLowerCase() === card.en.toLowerCase(); setRes(isOk ? "ok" : "fail"); if (isOk) setOk(c => c + 1); else { setBad(c => c + 1); setSk(k => k + 1); } };
+  const next = () => { setIdx(i => i + 1); setVal(""); setRes(null); };
+  const handleDraw = async dataUrl => {
+    setChecking(true);
+    try { const blob = await fetch(dataUrl).then(r => r.blob()); const file = new File([blob], "draw.png", { type: "image/png" }); const pairs = await doOCR(file, null); check(pairs[0] ? pairs[0].en : ""); }
+    catch { check(""); } finally { setChecking(false); }
+  };
+  const fbBg = res === "ok" ? "rgba(48,209,88,.15)" : "rgba(255,69,58,.15)";
+  const fbBrd = res === "ok" ? "rgba(48,209,88,.25)" : "rgba(255,69,58,.25)";
+  const fbClr = res === "ok" ? "var(--gn)" : "var(--rd)";
+  const fbTxt = res === "ok" ? "🎉 정답!" : "❌ 정답: " + card.en;
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 16px 0" }}>
+      <ProgBar val={idx} max={deck.length} ok={ok} bad={bad} />
+      <div className="gl" style={{ display: "flex", borderRadius: 12, padding: 3, marginBottom: 12, flexShrink: 0 }}>
+        {[["type", "⌨️ 타이핑"], ["draw", "✏️ 손글씨"]].map(([m, l]) => (
+          <button key={m} onClick={() => { setMode(m); setRes(null); setVal(""); }}
+            style={{ flex: 1, padding: "7px", border: "none", borderRadius: 9, cursor: "pointer", touchAction: "manipulation", background: mode === m ? "var(--ac)" : "transparent", color: mode === m ? "#fff" : "var(--t2)", fontFamily: "inherit", fontWeight: 600, fontSize: 14, transition: "all .2s" }}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="gl" style={{ borderRadius: 20, padding: "22px 18px", textAlign: "center", marginBottom: 14, flexShrink: 0 }}>
+        <p style={{ fontSize: 11, color: "var(--t3)", letterSpacing: ".14em", fontWeight: 600, textTransform: "uppercase", marginBottom: 10 }}>한국어 뜻</p>
+        <p style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.2, marginBottom: 6 }}>{card.ko}</p>
+        <p style={{ fontSize: 13, color: "var(--t3)" }}>{mode === "draw" ? "아래에 영어로 써주세요" : "영어로 입력하세요"}</p>
+      </div>
+      {mode === "type" && (
+        <>
+          <div key={sk} className={res === "fail" ? "ashk" : ""} style={{ marginBottom: 10 }}>
+            <input ref={iref} className="inp" type="text" placeholder="영어 스펠링..."
+              value={val} onChange={e => setVal(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && (res ? next() : check(val))}
+              disabled={!!res}
+              style={{ textAlign: "center", fontSize: 20, fontWeight: 600, borderColor: res === "ok" ? "var(--gn)" : res === "fail" ? "var(--rd)" : undefined }}
+              autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck="false" />
+          </div>
+          {res && (
+            <>
+              <button onClick={() => speak(card.en)} style={{ display: "flex", alignItems: "center", gap: 6, margin: "0 auto 10px", background: "rgba(10,132,255,.15)", border: "1px solid rgba(10,132,255,.25)", borderRadius: 20, padding: "6px 16px", cursor: "pointer", touchAction: "manipulation", color: "var(--ac)", fontSize: 13, fontFamily: "inherit", fontWeight: 500 }}>
+                {IcoSpk("var(--ac)")} 발음 듣기
+              </button>
+              <div style={{ padding: 12, borderRadius: 14, marginBottom: 12, textAlign: "center", background: fbBg, border: "1px solid " + fbBrd, color: fbClr, fontWeight: 600, fontSize: 16 }}>{fbTxt}</div>
+              <button className="btn ba" onClick={next}>다음 →</button>
+            </>
+          )}
+          {!res && <button className="btn ba" onClick={() => check(val)}>확인</button>}
+        </>
+      )}
+      {mode === "draw" && (
+        checking
+          ? <div style={{ textAlign: "center", padding: 20 }}><div className="spin" style={{ margin: "0 auto 8px" }} /><p style={{ fontSize: 14, color: "var(--t2)" }}>인식 중...</p></div>
+          : res ? (
+            <>
+              <div style={{ padding: 12, borderRadius: 14, marginBottom: 12, textAlign: "center", background: fbBg, border: "1px solid " + fbBrd, color: fbClr, fontWeight: 600, fontSize: 16 }}>{fbTxt}</div>
+              <button className="btn ba" onClick={next}>다음 →</button>
+            </>
+          ) : <DrawCanvas onSubmit={handleDraw} />
+      )}
+    </div>
+  );
+}
+
+// ── OCR FLOW ──────────────────────────────────────────────────────────────────
+function OCRFlow({ onDone, onClose }) {
+  const [step, setStep] = useState("pen");
+  const [penId, setPenId] = useState("red");
+  const [sFile, setSFile] = useState(null);
+  const [sPrev, setSPrev] = useState(null);
+  const [scans, setScans] = useState([]);
+  const [results, setResults] = useState([]);
+  const [msg, setMsg] = useState("");
+  const [pct, setPct] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const selPen = PENS.find(p => p.id === penId) || PENS[0];
+
+  const onSampleChange = useCallback(e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setSFile(file); setSPrev(URL.createObjectURL(file));
+    e.target.value = "";
+  }, []);
+
+  const onScansChange = useCallback(e => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    setScans(p => [...p, ...Array.from(files).map(f => ({ file: f, prev: URL.createObjectURL(f) }))]);
+    e.target.value = "";
+  }, []);
+
+  const removeS = i => setScans(p => p.filter((_, j) => j !== i));
+
+  const runOCR = async () => {
+    if (!sFile) { setErr("예시 사진을 먼저 선택해주세요."); return; }
+    setBusy(true); setErr(null); setPct(0);
+    try {
+      setMsg("예시 사진 인식 중..."); setPct(5);
+      const sp = await doOCR(sFile, (p, m) => { setPct(Math.round(p * .35)); if (m) setMsg(m); });
+      const all = [...sp];
+      for (let i = 0; i < scans.length; i++) {
+        setMsg("사진 " + (i + 1) + "/" + scans.length + " 인식 중...");
+        const p2 = await doOCR(scans[i].file, p => { setPct(35 + Math.round(((i + p / 100) / scans.length) * 60)); });
+        all.push(...p2);
+      }
+      const seen = new Set();
+      const uniq = all.filter(p => { const k = p.en.toLowerCase(); return seen.has(k) ? false : seen.add(k); });
+      // ★ 버그수정: busy false 먼저, 그 다음 step 변경
+      setBusy(false);
+      if (uniq.length === 0) {
+        setErr("인식된 단어가 없어요.\n인쇄체 단어장을 밝은 곳에서 찍어보세요.\n예시 형식: apple 사과");
+      } else {
+        setResults(uniq);
+        setStep("result");
+      }
+    } catch (e) { setErr("오류: " + e.message); setBusy(false); }
+  };
+
+  const reset = () => { setStep("pen"); setSFile(null); setSPrev(null); setScans([]); setResults([]); setErr(null); };
+  const steps = ["pen", "sample", "scan"];
+  const cur = steps.indexOf(step);
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexShrink: 0 }}>
+        <p style={{ fontSize: 18, fontWeight: 700 }}>사진으로 단어 추가</p>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--ac)", fontSize: 15, fontWeight: 600, cursor: "pointer", touchAction: "manipulation" }}>닫기</button>
+      </div>
+      {!busy && step !== "result" && <div className="pills">{steps.map((s, i) => <div key={s} className={"pill" + (i <= cur ? " on" : "")} />)}</div>}
+
+      {/* Pen */}
+      {step === "pen" && (
+        <div className="sc asli" style={{ flex: 1 }}>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>어떤 펜으로 표시했나요?</p>
+          <p style={{ fontSize: 14, color: "var(--t2)", marginBottom: 14, lineHeight: 1.6 }}>외워야 할 단어에 표시한 펜 색을 선택해주세요.</p>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            {PENS.map(p => (
+              <button key={p.id} onClick={() => setPenId(p.id)} style={{ flex: 1, height: 60, borderRadius: 14, cursor: "pointer", touchAction: "manipulation", fontSize: 26, display: "flex", alignItems: "center", justifyContent: "center", background: p.hex + "35", border: penId === p.id ? "3px solid " + p.hex : "2px solid transparent", transform: penId === p.id ? "scale(1.06)" : "scale(1)", transition: "all .15s", fontFamily: "inherit", outline: "none" }}>
+                {p.emoji}
+              </button>
+            ))}
+          </div>
+          <div className="glc" style={{ borderRadius: 14, padding: "11px 15px", marginBottom: 18, display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: selPen.hex, flexShrink: 0 }} />
+            <div><p style={{ fontWeight: 600, fontSize: 14 }}>{selPen.label + " 선택됨"}</p><p style={{ fontSize: 12, color: "var(--t2)" }}>선명할수록 인식률이 높아요</p></div>
+          </div>
+          <button className="btn ba" onClick={() => setStep("sample")}>다음</button>
+        </div>
+      )}
+
+      {/* Sample */}
+      {step === "sample" && (
+        <div className="sc asli" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>예시 사진 1장</p>
+          <p style={{ fontSize: 14, color: "var(--t2)", marginBottom: 12, lineHeight: 1.6 }}>{selPen.emoji + " " + selPen.label + "으로 표시한 페이지 1장을 선택해주세요."}</p>
+          <label style={{ display: "block", height: sPrev ? 160 : 140, borderRadius: 16, overflow: "hidden", marginBottom: 14, flexShrink: 0, cursor: "pointer", position: "relative", border: sPrev ? "none" : "1.5px dashed rgba(255,255,255,.2)", background: sPrev ? "transparent" : "rgba(255,255,255,.05)" }}>
+            {sPrev
+              ? <img src={sPrev} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} alt="" />
+              : <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}><div style={{ fontSize: 32 }}>📸</div><p style={{ fontWeight: 600, color: "var(--t1)" }}>탭해서 사진 선택</p><p style={{ fontSize: 13, color: "var(--t3)" }}>카메라 또는 앨범</p></div>
+            }
+            <input type="file" accept="image/*" className="finput" onChange={onSampleChange} />
+          </label>
+          <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+            <button className="btn bgh" style={{ flex: 1 }} onClick={() => setStep("pen")}>← 이전</button>
+            <button onClick={() => sFile && setStep("scan")} style={{ flex: 2, background: sFile ? "var(--ac)" : "var(--t4)", color: sFile ? "#fff" : "var(--t3)", borderRadius: 14, fontFamily: "inherit", fontWeight: 600, fontSize: 16, border: "none", padding: "13px", cursor: sFile ? "pointer" : "not-allowed", touchAction: "manipulation", opacity: sFile ? 1 : .5 }}>다음</button>
+          </div>
+        </div>
+      )}
+
+      {/* Scan */}
+      {step === "scan" && !busy && (
+        <div className="asli" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, flexShrink: 0 }}>전체 사진 추가</p>
+          <p style={{ fontSize: 14, color: "var(--t2)", marginBottom: 12, flexShrink: 0, lineHeight: 1.5 }}>단어가 있는 페이지를 모두 추가해주세요.</p>
+          <div className="sc" style={{ flex: 1, marginBottom: 10 }}>
+            <div className="phg">
+              {scans.map((s, i) => (
+                <div key={i} className="phc">
+                  <img src={s.prev} alt="" />
+                  <button className="phd" onClick={() => removeS(i)}>✕</button>
+                </div>
+              ))}
+              <label style={{ aspectRatio: "1", borderRadius: 12, background: "rgba(255,255,255,.07)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, cursor: "pointer", position: "relative", border: "1.5px dashed rgba(255,255,255,.15)" }}>
+                <span style={{ fontSize: 22, color: "var(--t2)" }}>＋</span>
+                <span style={{ fontSize: 11, color: "var(--t3)", fontWeight: 600 }}>추가</span>
+                <input type="file" accept="image/*" multiple className="finput" onChange={onScansChange} />
+              </label>
+            </div>
+            {err && <div style={{ marginTop: 12, padding: "11px 14px", borderRadius: 12, background: "rgba(255,69,58,.1)", border: "1px solid rgba(255,69,58,.2)", color: "var(--rd)", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-line" }}>{err}</div>}
+          </div>
+          <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+            <button className="btn bgh" style={{ flex: 1 }} onClick={() => setStep("sample")}>← 이전</button>
+            <button onClick={scans.length ? runOCR : undefined} style={{ flex: 2, background: scans.length ? "var(--ac)" : "var(--t4)", color: scans.length ? "#fff" : "var(--t3)", borderRadius: 14, fontFamily: "inherit", fontWeight: 600, fontSize: 16, border: "none", padding: "13px", cursor: scans.length ? "pointer" : "not-allowed", touchAction: "manipulation", opacity: scans.length ? 1 : .5 }}>🔍 인식 시작</button>
+          </div>
+        </div>
+      )}
+
+      {/* Processing */}
+      {busy && (
+        <div className="asli" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 20 }}>
+          <div className="spin" />
+          <p style={{ fontWeight: 600, fontSize: 16, textAlign: "center" }}>{msg}</p>
+          <div style={{ width: "100%" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 13, color: "var(--t2)" }}>진행률</span>
+              <span style={{ fontSize: 13, color: "var(--ac)", fontWeight: 600 }}>{pct + "%"}</span>
+            </div>
+            <div className="pt"><div className="pf" style={{ width: pct + "%" }} /></div>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--t3)", textAlign: "center", lineHeight: 1.6 }}>처음엔 언어 데이터 다운로드로 1~2분 걸릴 수 있어요</p>
+        </div>
+      )}
+
+      {/* Result */}
+      {step === "result" && (
+        <div className="asli" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexShrink: 0 }}>
+            <p style={{ fontSize: 18, fontWeight: 700 }}>{"인식 결과 "}<span style={{ color: "var(--ac)" }}>{results.length + "개"}</span></p>
+            <button onClick={reset} style={{ background: "none", border: "none", color: "var(--ac)", fontSize: 14, fontWeight: 600, cursor: "pointer", touchAction: "manipulation" }}>다시</button>
+          </div>
+          <div className="sc glc" style={{ flex: 1, marginBottom: 12, borderRadius: 14 }}>
+            {results.map((p, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 14px", borderBottom: i < results.length - 1 ? "1px solid rgba(255,255,255,.05)" : "none" }}>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>{p.en}</span>
+                <span style={{ fontSize: 14, color: "var(--t2)" }}>{p.ko}</span>
+              </div>
+            ))}
+          </div>
+          <button className="btn ba" style={{ flexShrink: 0 }} onClick={() => { onDone(results); onClose(); }}>단어장에 추가하기 ✓</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── WORD LIST ─────────────────────────────────────────────────────────────────
+function WordList({ words, onAdd, onDelete, onShare }) {
+  const [en, setEn] = useState("");
+  const [ko, setKo] = useState("");
+  const [showOCR, setShowOCR] = useState(false);
+
+  const add = () => { if (!en.trim() || !ko.trim()) return; onAdd(en.trim(), ko.trim()); setEn(""); setKo(""); };
+  const handleOCRDone = useCallback(pairs => { pairs.forEach(p => onAdd(p.en, p.ko)); }, [onAdd]);
+
+  if (showOCR) {
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 16px 0", overflow: "hidden" }}>
+        <OCRFlow onDone={handleOCRDone} onClose={() => setShowOCR(false)} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px 0", flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <p style={{ fontSize: 13, color: "var(--t2)", fontWeight: 500 }}>{words.length + "개의 단어"}</p>
+          <button onClick={onShare} style={{ background: "none", border: "none", color: "var(--ac)", fontSize: 14, fontWeight: 600, cursor: "pointer", touchAction: "manipulation" }}>🔗 공유</button>
+        </div>
+        <div className="gl" style={{ borderRadius: 16, padding: "12px 14px", marginBottom: 10 }}>
+          <p style={{ fontSize: 11, color: "var(--t3)", fontWeight: 600, letterSpacing: ".05em", textTransform: "uppercase", marginBottom: 8 }}>직접 추가</p>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <input className="inp" type="text" placeholder="English" value={en} onChange={e => setEn(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} style={{ flex: 1, padding: "10px 12px", fontSize: 15 }} autoCapitalize="off" autoCorrect="off" />
+            <input className="inp" type="text" placeholder="한국어" value={ko} onChange={e => setKo(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} style={{ flex: 1, padding: "10px 12px", fontSize: 15 }} />
+          </div>
+          <button className="btn ba" style={{ padding: "10px", fontSize: 15 }} onClick={add}>+ 추가</button>
+        </div>
+        <button onClick={() => setShowOCR(true)} className="gl" style={{ width: "100%", borderRadius: 16, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer", touchAction: "manipulation", border: "none", marginBottom: 2 }}>
+          <div style={{ width: 42, height: 42, background: "rgba(10,132,255,.18)", border: "1px solid rgba(10,132,255,.25)", borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>📸</div>
+          <div style={{ textAlign: "left", flex: 1 }}>
+            <p style={{ fontWeight: 600, fontSize: 15, color: "var(--t1)", marginBottom: 1 }}>사진으로 단어 추가</p>
+            <p style={{ fontSize: 13, color: "var(--t2)" }}>단어장을 찍으면 AI가 자동 인식해요</p>
+          </div>
+          <span style={{ color: "var(--ac)", fontSize: 18 }}>›</span>
+        </button>
+      </div>
+      <div className="sc" style={{ flex: 1, padding: "8px 16px 16px" }}>
+        {!words.length && <Empty icon="📝" title="단어가 없어요" sub="위에서 추가하거나 사진으로 불러오세요" />}
+        {words.length > 0 && (
+          <div className="glc" style={{ borderRadius: 16, overflow: "hidden" }}>
+            {words.map((w, i) => (
+              <div key={w.id} className="wrow" style={{ justifyContent: "space-between", borderBottom: i < words.length - 1 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flex: 1, minWidth: 0 }}>
+                  <span style={{ fontWeight: 600, fontSize: 16, flexShrink: 0 }}>{w.en}</span>
+                  <span style={{ fontSize: 14, color: "var(--t2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.ko}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+                  <button onClick={() => speak(w.en)} style={{ background: "none", border: "none", color: "var(--ac)", padding: "6px 8px", cursor: "pointer", touchAction: "manipulation", display: "flex", alignItems: "center" }}>{IcoSpk("var(--ac)")}</button>
+                  <button onClick={() => onDelete(w.id)} style={{ background: "none", border: "none", color: "var(--rd)", fontSize: 20, cursor: "pointer", padding: "2px 4px", touchAction: "manipulation" }}>−</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+function Settings({ cfg, onCfg, words, onShare, onClear }) {
+  const [confirm, setConfirm] = useState(false);
+  const lvColor = { "하": "#30d158", "중": "#0a84ff", "상": "#ff453a" };
+
+  return (
+    <div className="sc" style={{ flex: 1, padding: "8px 16px 24px" }}>
+      <p style={{ fontSize: 24, fontWeight: 700, marginBottom: 18, paddingTop: 8 }}>설정</p>
+
+      {/* 화면 */}
+      <p style={{ fontSize: 13, color: "var(--t2)", fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4 }}>화면</p>
+      <div className="glc" style={{ borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+        {[
+          { icon: "🌗", bg: "#2a2a30", label: "다크 모드", right: <Sw on={cfg.theme === "dark"} onChange={v => onCfg("theme", v ? "dark" : "light")} /> },
+          { icon: "🔀", bg: "#1a3a6e", label: "카드 자동 셔플", right: <Sw on={cfg.shuffle} onChange={v => onCfg("shuffle", v)} /> },
+          { icon: "🔁", bg: "#3a1a6e", label: "틀린 단어 다시 묻기", right: <Sw on={cfg.flashRetry} onChange={v => onCfg("flashRetry", v)} /> },
+          /* 🎤 발음 모드: HTTPS 배포 환경에서만 활성화 */
+        ].map((r, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", padding: "13px 16px", gap: 12, minHeight: 50, borderTop: i > 0 ? "1px solid rgba(255,255,255,.04)" : "none" }}>
+            <div style={{ width: 30, height: 30, borderRadius: 7, background: r.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>{r.icon}</div>
+            <span style={{ flex: 1, fontSize: 16 }}>{r.label}</span>
+            {r.right}
+          </div>
+        ))}
+      </div>
+
+      {/* 스펠링 */}
+      <p style={{ fontSize: 13, color: "var(--t2)", fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4 }}>스펠링 기본 모드</p>
+      <div className="glc" style={{ borderRadius: 16, overflow: "hidden", padding: "10px 14px", marginBottom: 20 }}>
+        <div style={{ display: "flex", background: "rgba(255,255,255,.07)", borderRadius: 10, padding: 3, gap: 3 }}>
+          {[["type", "⌨️ 타이핑"], ["draw", "✏️ 손글씨"]].map(([m, l]) => (
+            <button key={m} onClick={() => onCfg("spellMode", m)} style={{ flex: 1, padding: "8px", border: "none", borderRadius: 8, cursor: "pointer", touchAction: "manipulation", background: cfg.spellMode === m ? "var(--ac)" : "transparent", color: cfg.spellMode === m ? "#fff" : "var(--t2)", fontFamily: "inherit", fontWeight: 600, fontSize: 14 }}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* 오늘의 단어 */}
+      <p style={{ fontSize: 13, color: "var(--t2)", fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4 }}>오늘의 단어</p>
+      <div className="glc" style={{ borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "13px 16px", gap: 12, minHeight: 50, borderBottom: cfg.dailyOn ? "1px solid rgba(255,255,255,.04)" : "none" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 7, background: "#3a1a6e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>📅</div>
+          <span style={{ flex: 1, fontSize: 16 }}>매일 단어 추천</span>
+          <Sw on={cfg.dailyOn} onChange={v => onCfg("dailyOn", v)} />
+        </div>
+        {cfg.dailyOn && (
+          <>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+              <p style={{ fontSize: 13, color: "var(--t2)", marginBottom: 10, fontWeight: 500 }}>
+                단어 개수: <span style={{ color: "var(--ac)", fontWeight: 700 }}>{cfg.dailyCount}개</span>
+              </p>
+              <input type="range" min="5" max="50" step="5" value={cfg.dailyCount}
+                onChange={e => onCfg("dailyCount", Number(e.target.value))}
+                style={{ width: "100%", accentColor: "var(--ac)", cursor: "pointer" }} />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--t3)", marginTop: 4 }}>
+                <span>5개</span><span>25개</span><span>50개</span>
+              </div>
+            </div>
+            <div style={{ padding: "12px 16px" }}>
+              <p style={{ fontSize: 13, color: "var(--t2)", marginBottom: 10, fontWeight: 500 }}>난이도</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                {[["하", "기초"], ["중", "중급"], ["상", "고급"]].map(([lv, sub]) => (
+                  <button key={lv} onClick={() => onCfg("dailyLevel", lv)}
+                    style={{ flex: 1, padding: "10px 4px", border: cfg.dailyLevel === lv ? "2px solid " + lvColor[lv] : "2px solid transparent", borderRadius: 12, cursor: "pointer", touchAction: "manipulation", background: cfg.dailyLevel === lv ? lvColor[lv] + "22" : "rgba(255,255,255,.05)", fontFamily: "inherit", transition: "all .15s" }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: cfg.dailyLevel === lv ? lvColor[lv] : "var(--t2)" }}>{lv}</div>
+                    <div style={{ fontSize: 11, color: "var(--t3)", marginTop: 2 }}>{sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 단어장 */}
+      <p style={{ fontSize: 13, color: "var(--t2)", fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", marginBottom: 7, paddingLeft: 4 }}>단어장</p>
+      <div className="glc" style={{ borderRadius: 16, overflow: "hidden", marginBottom: 20 }}>
+        <button onClick={onShare} style={{ display: "flex", alignItems: "center", padding: "13px 16px", gap: 12, width: "100%", background: "none", border: "none", cursor: "pointer", touchAction: "manipulation", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
+          <div style={{ width: 30, height: 30, borderRadius: 7, background: "#1a4a8a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>🔗</div>
+          <span style={{ flex: 1, fontSize: 16, color: "var(--t1)", textAlign: "left" }}>{words.length + "개 단어 공유하기"}</span>
+          <span style={{ color: "var(--ac)", fontSize: 17 }}>›</span>
+        </button>
+        {!confirm
+          ? <button onClick={() => setConfirm(true)} style={{ display: "flex", alignItems: "center", padding: "13px 16px", gap: 12, width: "100%", background: "none", border: "none", cursor: "pointer", touchAction: "manipulation" }}>
+              <div style={{ width: 30, height: 30, borderRadius: 7, background: "#5a1a1a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>🗑️</div>
+              <span style={{ flex: 1, fontSize: 16, color: "var(--rd)", textAlign: "left" }}>전체 단어 삭제</span>
+              <span style={{ color: "var(--rd)", fontSize: 17 }}>›</span>
+            </button>
+          : <div style={{ padding: "12px 16px" }}>
+              <p style={{ fontSize: 14, color: "var(--rd)", fontWeight: 600, marginBottom: 10 }}>정말 삭제할까요?</p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn bgh" style={{ flex: 1, padding: 10, fontSize: 14 }} onClick={() => setConfirm(false)}>취소</button>
+                <button className="btn" style={{ flex: 1, padding: 10, fontSize: 14, background: "var(--rd)", color: "#fff", borderRadius: 14, fontFamily: "inherit", fontWeight: 600, border: "none", cursor: "pointer" }} onClick={() => { onClear(); setConfirm(false); }}>삭제</button>
+              </div>
+            </div>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ── Orientation ───────────────────────────────────────────────────────────────
+function useOrientation() {
+  const get = () => window.innerWidth > window.innerHeight;
+  const [lan, setLan] = useState(get);
+  useEffect(() => {
+    const h = () => setLan(get());
+    window.addEventListener("resize", h);
+    window.addEventListener("orientationchange", h);
+    return () => { window.removeEventListener("resize", h); window.removeEventListener("orientationchange", h); };
+  }, []);
+  return lan;
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+const DEMO = [
+  { id: uid(), en: "serendipity", ko: "뜻밖의 행운" },
+  { id: uid(), en: "ephemeral",   ko: "순간적인" },
+  { id: uid(), en: "resilience",  ko: "회복력" },
+  { id: uid(), en: "eloquent",    ko: "유창한" },
+];
+const DEF_CFG = { theme: "light", shuffle: true, spellMode: "type", dailyOn: true, dailyCount: 20, dailyLevel: "중", flashRetry: true, listenMode: false /* hidden */ };
+
+function App() {
+  const [words,  setWords]  = useState(() => getShared() || S.get("words", DEMO));
+  const [tab,    setTab]    = useState("daily");
+  const [cfg,    setCfg]    = useState(() => ({ ...DEF_CFG, ...S.get("cfg", {}) }));
+  const [toast,  setToast]  = useState(null);
+  const lan = useOrientation();
+
+  useEffect(() => S.set("words", words), [words]);
+  useEffect(() => S.set("cfg",   cfg),   [cfg]);
+  useEffect(() => { document.documentElement.setAttribute("data-t", cfg.theme); }, [cfg.theme]);
+  // 오늘의 단어 꺼져 있으면 daily 탭에서 list로 이동
+  useEffect(() => { if (!cfg.dailyOn && tab === "daily") setTab("list"); }, [cfg.dailyOn]);
+
+  const updCfg  = useCallback((k, v) => setCfg(c => ({ ...c, [k]: v })), []);
+  const addWord = useCallback((en, ko) => { if (!en || !ko) return; setWords(ws => [...ws, { id: uid(), en, ko }]); }, []);
+  const delWord = useCallback(id => setWords(ws => ws.filter(w => w.id !== id)), []);
+  const clearAll = useCallback(() => setWords([]), []);
+
+  const showToast = useCallback(msg => { setToast(msg); setTimeout(() => setToast(null), 2500); }, []);
+  const handleShare = useCallback(async () => {
+    if (!words.length) { showToast("단어가 없어요!"); return; }
+    const url = mkUrl(words);
+    try {
+      if (navigator.share) await navigator.share({ title: "VOCAB 단어장", text: words.length + "개 단어 공유", url });
+      else { await navigator.clipboard.writeText(url); showToast("📋 링크 복사됨!"); }
+    } catch {
+      try { await navigator.clipboard.writeText(url); showToast("📋 링크 복사됨!"); }
+      catch { showToast("공유 실패"); }
+    }
+  }, [words, showToast]);
+
+  const TABS = [
+    ...(cfg.dailyOn ? [{ key: "daily", label: "오늘", ico: IcoDaily }] : []),
+    { key: "list",     label: "단어장", ico: IcoList },
+    { key: "flash",    label: "플래시", ico: IcoFlash },
+    { key: "spell",    label: "스펠링", ico: IcoSpell },
+    { key: "settings", label: "설정",   ico: IcoGear },
+  ];
+
+  const wkey = words.map(w => w.id).join(",");
+  const padStyle = lan ? { paddingLeft: "calc(82px + var(--sl))" } : { paddingBottom: "calc(72px + var(--sb))" };
+
+  return (
+    <>
+      <style>{STYLES}</style>
+
+```
+  <div data-t={cfg.theme} style={{ height: "100dvh", width: "100%", display: "flex", flexDirection: "column", overflow: "hidden", background: "var(--bg)", color: "var(--t1)", position: "relative" }}>
+    <div className="mesh" />
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative", zIndex: 1, paddingTop: "var(--st)", ...padStyle }}>
+      {tab === "daily"    && cfg.dailyOn && <DailyScreen cfg={cfg} onAddWords={ws => ws.forEach(w => addWord(w.en, w.ko))} />}
+      {tab === "list"     && <WordList key="list" words={words} onAdd={addWord} onDelete={delWord} onShare={handleShare} />}
+      {tab === "flash"    && <FlashLauncher words={words} cfg={cfg} onCfg={updCfg} />}
+      {tab === "spell"    && <Spell    key={wkey} words={words} defMode={cfg.spellMode} />}
+      {tab === "settings" && <Settings cfg={cfg} onCfg={updCfg} words={words} onShare={handleShare} onClear={clearAll} />}
+    </div>
+    <div className={"tbw " + (lan ? "lan" : "por")} style={{ zIndex: 100 }}>
+      <div className={"tb " + (lan ? "lan" : "por")}>
+        {TABS.map(t => {
+          const on = tab === t.key;
+          const c = on ? "var(--ac)" : "var(--t3)";
+          return (
+            <button key={t.key} className={"tab" + (on ? " on" : "")} onClick={() => setTab(t.key)}>
+              {t.ico(c)}
+              <span style={{ fontSize: 10, marginTop: 1 }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+    {toast && <div className="toast-el" style={{ bottom: lan ? "20px" : "calc(78px + var(--sb))" }}>{toast}</div>}
+  </div>
+</>
+```
+
+);
+}
+
+// Mount app
+const _root = ReactDOM.createRoot(document.getElementById(‘root’));
+_root.render(React.createElement(App));
+// Hide loading after first render
+setTimeout(window.__hideLoading, 100);
+</script>
+
+<script>
+// Fallback: hide loading after 8 seconds even if something fails
+setTimeout(window.__hideLoading, 8000);
+</script>
+
+</body>
+</html>
